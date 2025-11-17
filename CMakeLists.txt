@@ -14,14 +14,19 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_TESTS "Build tests" OFF)
-option(ENABLE_TENSORRT "Enable TensorRT backend" ON)
+option(ENABLE_TENSORRT "Enable TensorRT backend" OFF)
 option(ENABLE_ONNXRUNTIME "Enable ONNX Runtime backend" ON)
 option(ENABLE_OPENVINO "Enable OpenVINO backend" OFF)
+
+# 查找依赖
+find_package(OpenCV REQUIRED)
+find_package(Threads REQUIRED)
 
 # 包含路径
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
+    ${OpenCV_INCLUDE_DIRS}
 )
 
 # 源文件
@@ -33,10 +38,15 @@ set(CORE_SOURCES
     src/data/inference_result.cpp
     src/utils/logger.cpp
     src/utils/image_utils.cpp
+    src/postprocess/yolo_postprocessor.cpp
 )
 
 # 核心库
 add_library(crkit_core ${CORE_SOURCES})
+target_link_libraries(crkit_core
+    ${OpenCV_LIBS}
+    Threads::Threads
+)
 
 # TensorRT后端
 if(ENABLE_TENSORRT)
@@ -55,14 +65,31 @@ endif()
 
 # ONNX Runtime后端
 if(ENABLE_ONNXRUNTIME)
-    find_library(ONNXRUNTIME_LIB onnxruntime HINTS /usr/local/lib)
+    find_library(ONNXRUNTIME_LIB onnxruntime
+        HINTS
+            /usr/local/lib
+            /usr/lib
+            /usr/lib/x86_64-linux-gnu
+    )
+    find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
+        HINTS
+            /usr/local/include
+            /usr/include
+            /usr/include/onnxruntime
+            /usr/local/include/onnxruntime
+    )
 
-    if(ONNXRUNTIME_LIB)
+    if(ONNXRUNTIME_LIB AND ONNXRUNTIME_INCLUDE_DIR)
+        message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
         add_library(crkit_onnxruntime
             src/engines/onnxruntime/onnx_engine.cpp
         )
+        target_include_directories(crkit_onnxruntime PRIVATE ${ONNXRUNTIME_INCLUDE_DIR})
         target_link_libraries(crkit_onnxruntime crkit_core ${ONNXRUNTIME_LIB})
         target_compile_definitions(crkit_core PUBLIC ENABLE_ONNXRUNTIME)
+    else()
+        message(WARNING "ONNX Runtime not found, disabling ONNX backend")
+        set(ENABLE_ONNXRUNTIME OFF)
     endif()
 endif()
 
