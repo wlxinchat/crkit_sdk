@@ -70,7 +70,6 @@ public:
                      float iou_threshold,
                      int max_detections = -1);
 
-private:
     static float ComputeIOU(const BBox& a, const BBox& b);
 };
 

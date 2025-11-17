@@ -75,6 +75,7 @@ using Shape = std::vector<int64_t>;
 
 // 计算元素总数
 inline int64_t ShapeSize(const Shape& shape) {
+    if (shape.empty()) return 0;
     int64_t size = 1;
     for (auto dim : shape) {
         size *= dim;
