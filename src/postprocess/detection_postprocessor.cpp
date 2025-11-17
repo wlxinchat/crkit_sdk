@@ -1,4 +1,4 @@
-#include "crkit/postprocess/yolo_postprocessor.h"
+#include "crkit/postprocess/detection_postprocessor.h"
 #include "crkit/utils/logger.h"
 #include <algorithm>
 #include <cmath>
@@ -6,12 +6,12 @@
 namespace crkit {
 namespace postprocess {
 
-YOLOPostProcessor::YOLOPostProcessor(const YOLOConfig& config)
+ObjectDetectionPostProcessor::ObjectDetectionPostProcessor(const DetectionConfig& config)
     : config_(config) {
 }
 
-Status YOLOPostProcessor::Process(const std::vector<Tensor>& model_outputs,
-                                  InferenceResult& result) {
+Status ObjectDetectionPostProcessor::Process(const std::vector<Tensor>& model_outputs,
+                                            InferenceResult& result) {
     if (model_outputs.empty()) {
         return Status(StatusCode::ERROR_INVALID_OUTPUT, "Empty model outputs");
     }
@@ -19,27 +19,23 @@ Status YOLOPostProcessor::Process(const std::vector<Tensor>& model_outputs,
     result.Clear();
     std::vector<Detection> all_detections;
 
-    // 解析YOLO输出
-    // YOLO11/v8输出格式通常是: [batch, 84, 8400] 或 [batch, num_boxes, 4+num_classes]
+    // 解析模型输出
     const Tensor& output = model_outputs[0];
     const auto& shape = output.GetShape();
 
-    CRKIT_LOG_DEBUG("YOLO output shape: [", shape[0], ", ", shape[1], ", ", shape[2], "]");
+    CRKIT_LOG_DEBUG("Detection output shape: [", shape[0], ", ", shape[1], ", ", shape[2], "]");
 
-    // 判断输出格式并解析
-    if (shape.size() == 3) {
-        // 格式1: [batch, num_classes+4, num_boxes] - YOLO v8/v11常见格式
-        // 格式2: [batch, num_boxes, num_classes+4] - YOLO v5格式
-        if (shape[1] > shape[2]) {
-            // 格式2
-            auto status = ParseYOLOOutput(output, all_detections);
-            if (!status.IsOK()) return status;
-        } else {
-            // 格式1 - 需要转置
-            auto status = ParseYOLO11Output(output, all_detections);
-            if (!status.IsOK()) return status;
-        }
+    // 根据配置的输出格式解析
+    Status status;
+    if (config_.output_format == DetectionConfig::OutputFormat::TRANSPOSED) {
+        // 转置格式: [batch, channels, num_boxes]
+        status = ParseTransposedOutput(output, all_detections);
+    } else {
+        // 扁平格式: [batch, num_boxes, channels]
+        status = ParseFlatOutput(output, all_detections);
     }
+
+    if (!status.IsOK()) return status;
 
     // 应用NMS
     ApplyNMS(all_detections);
@@ -57,27 +53,28 @@ Status YOLOPostProcessor::Process(const std::vector<Tensor>& model_outputs,
         result.detections.resize(config_.max_detections);
     }
 
-    CRKIT_LOG_INFO("YOLO post-processing: ", result.detections.size(), " detections");
+    CRKIT_LOG_INFO("Object detection post-processing: ", result.detections.size(), " detections");
 
     return Status();
 }
 
-Status YOLOPostProcessor::ParseYOLOOutput(const Tensor& output,
-                                         std::vector<Detection>& detections) {
+Status ObjectDetectionPostProcessor::ParseFlatOutput(const Tensor& output,
+                                                    std::vector<Detection>& detections) {
     const auto& shape = output.GetShape();
-    // 期望形状: [batch, num_boxes, 4+num_classes]
+    // 期望形状: [batch, num_boxes, 4+num_classes] 或 [batch, num_boxes, 5+num_classes]
     if (shape.size() != 3) {
-        return Status(StatusCode::ERROR_INVALID_OUTPUT, "Invalid YOLO output shape");
+        return Status(StatusCode::ERROR_INVALID_OUTPUT, "Invalid detection output shape");
     }
 
     int num_boxes = shape[1];
-    int box_dim = shape[2];  // 4 (bbox) + num_classes
+    int box_dim = shape[2];  // 4 (bbox) + 1 (objectness, optional) + num_classes
 
-    if (box_dim < 5) {
+    if (box_dim < 4 + config_.num_classes) {
         return Status(StatusCode::ERROR_INVALID_OUTPUT, "Invalid box dimension");
     }
 
     const float* data = output.Data<float>();
+    bool has_objectness = (box_dim == 5 + config_.num_classes);
 
     for (int i = 0; i < num_boxes; ++i) {
         const float* box_data = data + i * box_dim;
@@ -92,20 +89,27 @@ Status YOLOPostProcessor::ParseYOLOOutput(const Tensor& output,
         float x = cx - w / 2.0f;
         float y = cy - h / 2.0f;
 
+        // objectness分数（如果有）
+        float objectness = has_objectness ? box_data[4] : 1.0f;
+        int class_offset = has_objectness ? 5 : 4;
+
         // 查找最高置信度的类别
         int best_class_id = -1;
-        float best_confidence = 0.0f;
+        float best_class_score = 0.0f;
 
         for (int c = 0; c < config_.num_classes; ++c) {
-            float class_score = box_data[4 + c];
-            if (class_score > best_confidence) {
-                best_confidence = class_score;
+            float class_score = box_data[class_offset + c];
+            if (class_score > best_class_score) {
+                best_class_score = class_score;
                 best_class_id = c;
             }
         }
 
+        // 综合置信度 = objectness * class_score
+        float confidence = objectness * best_class_score;
+
         // 过滤低置信度
-        if (best_confidence < config_.conf_threshold) {
+        if (confidence < config_.conf_threshold) {
             continue;
         }
 
@@ -113,7 +117,7 @@ Status YOLOPostProcessor::ParseYOLOOutput(const Tensor& output,
         Detection det;
         det.bbox = BBox(x, y, w, h);
         det.class_id = best_class_id;
-        det.confidence = best_confidence;
+        det.confidence = confidence;
 
         // 设置类别名称
         if (best_class_id < static_cast<int>(config_.class_names.size())) {
@@ -128,29 +132,32 @@ Status YOLOPostProcessor::ParseYOLOOutput(const Tensor& output,
     return Status();
 }
 
-Status YOLOPostProcessor::ParseYOLO11Output(const Tensor& output,
-                                           std::vector<Detection>& detections) {
+Status ObjectDetectionPostProcessor::ParseTransposedOutput(const Tensor& output,
+                                                          std::vector<Detection>& detections) {
     const auto& shape = output.GetShape();
-    // 期望形状: [batch, 4+num_classes, num_boxes]
-    // 例如: [1, 84, 8400] for COCO (80 classes)
-
+    // 期望形状: [batch, 4+num_classes, num_boxes] 或 [batch, 5+num_classes, num_boxes]
     if (shape.size() != 3) {
-        return Status(StatusCode::ERROR_INVALID_OUTPUT, "Invalid YOLO11 output shape");
+        return Status(StatusCode::ERROR_INVALID_OUTPUT, "Invalid detection output shape");
     }
 
     int batch = shape[0];
-    int box_dim = shape[1];  // 4 + num_classes
+    int channels = shape[1];  // 4 + num_classes 或 5 + num_classes
     int num_boxes = shape[2];
 
-    if (box_dim < 5 || batch != 1) {
+    if (batch != 1) {
+        return Status(StatusCode::ERROR_INVALID_OUTPUT, "Batch size must be 1");
+    }
+
+    bool has_objectness = (channels == 5 + config_.num_classes);
+    if (!has_objectness && channels != 4 + config_.num_classes) {
         return Status(StatusCode::ERROR_INVALID_OUTPUT,
-                     "Invalid YOLO11 output dimensions");
+                     "Invalid channel dimension");
     }
 
     const float* data = output.Data<float>();
 
-    // YOLO11输出格式: [cx, cy, w, h, class1, class2, ..., classN]
-    // 数据布局: [batch, channels, boxes] - 转置格式
+    // 转置格式: [batch, channels, boxes]
+    // 数据布局: 每个通道的所有boxes连续存储
 
     for (int i = 0; i < num_boxes; ++i) {
         // 提取边界框坐标 (前4个通道)
@@ -163,20 +170,27 @@ Status YOLOPostProcessor::ParseYOLO11Output(const Tensor& output,
         float x = cx - w / 2.0f;
         float y = cy - h / 2.0f;
 
+        // objectness（如果有）
+        float objectness = has_objectness ? data[4 * num_boxes + i] : 1.0f;
+        int class_offset = has_objectness ? 5 : 4;
+
         // 查找最高置信度的类别
         int best_class_id = -1;
-        float best_confidence = 0.0f;
+        float best_class_score = 0.0f;
 
         for (int c = 0; c < config_.num_classes; ++c) {
-            float class_score = data[(4 + c) * num_boxes + i];
-            if (class_score > best_confidence) {
-                best_confidence = class_score;
+            float class_score = data[(class_offset + c) * num_boxes + i];
+            if (class_score > best_class_score) {
+                best_class_score = class_score;
                 best_class_id = c;
             }
         }
 
+        // 综合置信度
+        float confidence = objectness * best_class_score;
+
         // 过滤低置信度
-        if (best_confidence < config_.conf_threshold) {
+        if (confidence < config_.conf_threshold) {
             continue;
         }
 
@@ -184,7 +198,7 @@ Status YOLOPostProcessor::ParseYOLO11Output(const Tensor& output,
         Detection det;
         det.bbox = BBox(x, y, w, h);
         det.class_id = best_class_id;
-        det.confidence = best_confidence;
+        det.confidence = confidence;
 
         // 设置类别名称
         if (best_class_id < static_cast<int>(config_.class_names.size())) {
@@ -199,17 +213,17 @@ Status YOLOPostProcessor::ParseYOLO11Output(const Tensor& output,
     return Status();
 }
 
-void YOLOPostProcessor::ApplyNMS(std::vector<Detection>& detections) {
+void ObjectDetectionPostProcessor::ApplyNMS(std::vector<Detection>& detections) {
     NMS::Apply(detections, config_.iou_threshold, config_.max_detections);
 }
 
-float YOLOPostProcessor::ComputeIOU(const BBox& a, const BBox& b) {
+float ObjectDetectionPostProcessor::ComputeIOU(const BBox& a, const BBox& b) {
     return NMS::ComputeIOU(a, b);
 }
 
-void YOLOPostProcessor::ScaleCoordinates(Detection& det,
-                                        int orig_width,
-                                        int orig_height) {
+void ObjectDetectionPostProcessor::ScaleCoordinates(Detection& det,
+                                                   int orig_width,
+                                                   int orig_height) {
     float scale_x = static_cast<float>(orig_width) / config_.input_width;
     float scale_y = static_cast<float>(orig_height) / config_.input_height;
 

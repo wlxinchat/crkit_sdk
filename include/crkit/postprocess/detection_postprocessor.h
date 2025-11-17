@@ -9,8 +9,8 @@
 namespace crkit {
 namespace postprocess {
 
-// YOLO后处理配置
-struct YOLOConfig {
+// 目标检测后处理配置
+struct DetectionConfig {
     int num_classes = 80;                    // 类别数量
     float conf_threshold = 0.25f;            // 置信度阈值
     float iou_threshold = 0.45f;             // NMS的IOU阈值
@@ -18,32 +18,40 @@ struct YOLOConfig {
     std::vector<std::string> class_names;    // 类别名称
     int input_width = 640;                   // 输入图像宽度
     int input_height = 640;                  // 输入图像高度
+
+    // 输出格式配置
+    enum class OutputFormat {
+        FLAT,       // [batch, num_boxes, 4+1+num_classes] - bbox + objectness + classes
+        TRANSPOSED, // [batch, 4+num_classes, num_boxes] - 转置格式
+        SEPARATE    // 独立的bbox和class输出
+    };
+    OutputFormat output_format = OutputFormat::TRANSPOSED;
 };
 
-// YOLO后处理器 - 支持YOLOv5/v8/v11格式
-class YOLOPostProcessor : public IPostProcessor {
+// 通用目标检测后处理器
+class ObjectDetectionPostProcessor : public IPostProcessor {
 public:
-    explicit YOLOPostProcessor(const YOLOConfig& config);
-    ~YOLOPostProcessor() override = default;
+    explicit ObjectDetectionPostProcessor(const DetectionConfig& config);
+    ~ObjectDetectionPostProcessor() override = default;
 
     // 后处理主函数
     Status Process(const std::vector<Tensor>& model_outputs,
                   InferenceResult& result) override;
 
     // 设置配置
-    void SetConfig(const YOLOConfig& config) { config_ = config; }
-    const YOLOConfig& GetConfig() const { return config_; }
+    void SetConfig(const DetectionConfig& config) { config_ = config; }
+    const DetectionConfig& GetConfig() const { return config_; }
 
 private:
-    YOLOConfig config_;
+    DetectionConfig config_;
 
-    // 解析YOLO输出（YOLOv5/v8格式: [batch, num_boxes, 4+1+num_classes]）
-    Status ParseYOLOOutput(const Tensor& output,
+    // 解析扁平格式输出 [batch, num_boxes, 4+1+num_classes]
+    Status ParseFlatOutput(const Tensor& output,
                           std::vector<Detection>& detections);
 
-    // 解析YOLO11输出（可能有不同的格式）
-    Status ParseYOLO11Output(const Tensor& output,
-                            std::vector<Detection>& detections);
+    // 解析转置格式输出 [batch, 4+num_classes, num_boxes]
+    Status ParseTransposedOutput(const Tensor& output,
+                                std::vector<Detection>& detections);
 
     // NMS（非极大值抑制）
     void ApplyNMS(std::vector<Detection>& detections);

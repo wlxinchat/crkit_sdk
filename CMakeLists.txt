@@ -38,7 +38,7 @@ set(CORE_SOURCES
     src/data/inference_result.cpp
     src/utils/logger.cpp
     src/utils/image_utils.cpp
-    src/postprocess/yolo_postprocessor.cpp
+    src/postprocess/detection_postprocessor.cpp
 )
 
 # 核心库
