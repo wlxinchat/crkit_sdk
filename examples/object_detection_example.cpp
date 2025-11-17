@@ -1,7 +1,7 @@
 /**
  * 通用目标检测示例
  *
- * 支持各种目标检测模型（如YOLO系列、SSD、RetinaNet等）
+ * 支持各种目标检测模型（如单阶段检测器、两阶段检测器等）
  * 只需配置正确的输出格式和后处理参数
  */
 
@@ -39,9 +39,9 @@ int main(int argc, char** argv) {
         std::cout << "  conf_threshold  - 置信度阈值 (默认: 0.25)\n";
         std::cout << "  iou_threshold   - NMS IOU阈值 (默认: 0.45)\n";
         std::cout << "\n支持的模型:\n";
-        std::cout << "  - YOLO系列 (v5/v8/v11)\n";
-        std::cout << "  - SSD\n";
-        std::cout << "  - RetinaNet\n";
+        std::cout << "  - 单阶段检测器\n";
+        std::cout << "  - 两阶段检测器\n";
+        std::cout << "  - Anchor-free检测器\n";
         std::cout << "  - 其他目标检测模型\n";
         return 1;
     }
@@ -73,8 +73,8 @@ int main(int argc, char** argv) {
     det_config.class_names = GetCOCOClassNames();
 
     // 设置输出格式（根据实际模型调整）
-    // TRANSPOSED: [batch, channels, num_boxes] - YOLO v8/v11常用
-    // FLAT: [batch, num_boxes, channels] - YOLO v5等
+    // TRANSPOSED: [batch, channels, num_boxes] - 转置格式（通道优先）
+    // FLAT: [batch, num_boxes, channels] - 扁平格式（框优先）
     det_config.output_format = crkit::postprocess::DetectionConfig::OutputFormat::TRANSPOSED;
 
     auto det_postprocessor =
