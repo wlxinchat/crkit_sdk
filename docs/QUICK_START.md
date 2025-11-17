@@ -410,6 +410,6 @@ model.export(format='onnx', imgsz=640)
 
 ## 获取帮助
 
-- GitHub Issues: https://github.com/yourorg/crkit_sdk/issues
-- 文档: https://docs.yourorg.com/crkit_sdk
-- Email: support@yourorg.com
+- Email: wlxinchat@gmail.com
+- 文档: 详见 docs/ 目录
+- GitHub Issues: (待配置)

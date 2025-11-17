@@ -322,8 +322,8 @@ Apache License 2.0 - 详见 [LICENSE](LICENSE) 文件
 
 ## 📮 联系方式
 
-- GitHub Issues: https://github.com/yourorg/crkit_sdk/issues
-- Email: support@yourorg.com
+- Email: wlxinchat@gmail.com
+- GitHub Issues: (待配置)
 
 ---
 
