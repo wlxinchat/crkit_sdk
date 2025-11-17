@@ -1,0 +1,60 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Compiled files
+*.o
+*.so
+*.a
+*.dylib
+*.dll
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test outputs
+test_output/
+*.log
+
+# Models and data
+*.engine
+*.onnx
+*.pb
+*.tflite
+*.bin
+*.weights
+*.pth
+*.pt
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation build
+docs/_build/
+docs/html/
+docs/latex/
+
+# Python (if adding Python bindings)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
