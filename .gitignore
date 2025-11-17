@@ -30,11 +30,13 @@ Makefile
 # Test outputs
 test_output/
 *.log
+logs/
 
 # Test executables
 test_tensor
 test_nms
 test_comprehensive
+test_logger
 
 # Models and data
 *.engine
