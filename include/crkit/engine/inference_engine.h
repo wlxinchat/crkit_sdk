@@ -94,9 +94,31 @@ public:
         const std::string& model_path,
         const InferenceConfig& config = InferenceConfig());
 
-    // 注册自定义引擎
+    // 自定义引擎管理
     using EngineCreator = std::function<std::shared_ptr<IInferenceEngine>()>;
+
+    /**
+     * @brief 通过名称创建自定义引擎
+     * @param name 引擎名称
+     * @param config 配置
+     * @return 引擎实例，失败返回nullptr
+     */
+    static std::shared_ptr<IInferenceEngine> CreateByName(
+        const std::string& name,
+        const InferenceConfig& config = InferenceConfig());
+
+    /**
+     * @brief 注册自定义引擎
+     * @param name 引擎名称
+     * @param creator 引擎创建函数
+     */
     static void RegisterEngine(const std::string& name, EngineCreator creator);
+
+    /**
+     * @brief 获取所有已注册的引擎名称
+     * @return 引擎名称列表
+     */
+    static std::vector<std::string> GetRegisteredEngines();
 
 private:
     InferenceEngineFactory() = default;

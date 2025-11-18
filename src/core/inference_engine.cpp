@@ -1,8 +1,15 @@
 #include "crkit/engine/inference_engine.h"
 #include "crkit/engines/onnxruntime/onnx_engine.h"
 #include "crkit/utils/logger.h"
+#include <unordered_map>
 
 namespace crkit {
+
+// 引擎注册表（静态全局）
+static std::unordered_map<std::string, InferenceEngineFactory::EngineCreator>& GetEngineRegistry() {
+    static std::unordered_map<std::string, InferenceEngineFactory::EngineCreator> registry;
+    return registry;
+}
 
 std::shared_ptr<IInferenceEngine> InferenceEngineFactory::Create(
     EngineType type,
@@ -16,13 +23,11 @@ std::shared_ptr<IInferenceEngine> InferenceEngineFactory::Create(
             break;
 
         case EngineType::TENSORRT:
-            // TODO: 实现TensorRT引擎
-            CRKIT_LOG_ERROR("TensorRT engine not yet implemented");
+            CRKIT_LOG_WARNING("TensorRT engine not yet implemented");
             return nullptr;
 
         case EngineType::OPENVINO:
-            // TODO: 实现OpenVINO引擎
-            CRKIT_LOG_ERROR("OpenVINO engine not yet implemented");
+            CRKIT_LOG_WARNING("OpenVINO engine not yet implemented");
             return nullptr;
 
         case EngineType::AUTO:
@@ -67,10 +72,67 @@ std::shared_ptr<IInferenceEngine> InferenceEngineFactory::CreateAndLoad(
     return engine;
 }
 
+std::shared_ptr<IInferenceEngine> InferenceEngineFactory::CreateByName(
+    const std::string& name,
+    const InferenceConfig& config) {
+
+    auto& registry = GetEngineRegistry();
+    auto it = registry.find(name);
+
+    if (it == registry.end()) {
+        CRKIT_LOG_ERROR("Custom engine not found: ", name);
+        return nullptr;
+    }
+
+    CRKIT_LOG_INFO("Creating custom engine: ", name);
+
+    auto engine = it->second();
+    if (!engine) {
+        CRKIT_LOG_ERROR("Failed to create custom engine: ", name);
+        return nullptr;
+    }
+
+    auto status = engine->Initialize(config);
+    if (!status.IsOK()) {
+        CRKIT_LOG_ERROR("Failed to initialize custom engine ", name, ": ", status.Message());
+        return nullptr;
+    }
+
+    return engine;
+}
+
 void InferenceEngineFactory::RegisterEngine(const std::string& name,
                                             EngineCreator creator) {
-    // TODO: 实现自定义引擎注册
-    CRKIT_LOG_INFO("Registering custom engine: ", name);
+    if (name.empty()) {
+        CRKIT_LOG_ERROR("Engine name cannot be empty");
+        return;
+    }
+
+    if (!creator) {
+        CRKIT_LOG_ERROR("Engine creator cannot be null");
+        return;
+    }
+
+    auto& registry = GetEngineRegistry();
+
+    if (registry.find(name) != registry.end()) {
+        CRKIT_LOG_WARNING("Overwriting existing engine: ", name);
+    }
+
+    registry[name] = std::move(creator);
+    CRKIT_LOG_INFO("Successfully registered custom engine: ", name);
+}
+
+std::vector<std::string> InferenceEngineFactory::GetRegisteredEngines() {
+    auto& registry = GetEngineRegistry();
+    std::vector<std::string> names;
+    names.reserve(registry.size());
+
+    for (const auto& pair : registry) {
+        names.push_back(pair.first);
+    }
+
+    return names;
 }
 
 } // namespace crkit

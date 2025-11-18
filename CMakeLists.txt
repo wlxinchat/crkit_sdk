@@ -1,10 +1,21 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.16...3.27)
 project(crkit_sdk VERSION 1.0.0 LANGUAGES CXX)
 
 # C++标准
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 编译器版本要求
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "7.5")
+        message(FATAL_ERROR "GCC >= 7.5 required, found ${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0")
+        message(FATAL_ERROR "Clang >= 6.0 required, found ${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
+endif()
 
 # 编译选项
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3")
@@ -18,8 +29,10 @@ option(ENABLE_TENSORRT "Enable TensorRT backend" OFF)
 option(ENABLE_ONNXRUNTIME "Enable ONNX Runtime backend" ON)
 option(ENABLE_OPENVINO "Enable OpenVINO backend" OFF)
 
-# 查找依赖
-find_package(OpenCV REQUIRED)
+# 查找依赖（精确版本）
+find_package(OpenCV 4.2 REQUIRED COMPONENTS core imgproc imgcodecs)
+message(STATUS "Found OpenCV version: ${OpenCV_VERSION}")
+
 find_package(Threads REQUIRED)
 
 # 包含路径
@@ -65,6 +78,9 @@ endif()
 
 # ONNX Runtime后端
 if(ENABLE_ONNXRUNTIME)
+    # 最低版本要求
+    set(ONNXRUNTIME_MIN_VERSION "1.10.0")
+
     find_library(ONNXRUNTIME_LIB onnxruntime
         HINTS
             /usr/local/lib
@@ -80,7 +96,10 @@ if(ENABLE_ONNXRUNTIME)
     )
 
     if(ONNXRUNTIME_LIB AND ONNXRUNTIME_INCLUDE_DIR)
-        message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
+        message(STATUS "Found ONNX Runtime library: ${ONNXRUNTIME_LIB}")
+        message(STATUS "Found ONNX Runtime include: ${ONNXRUNTIME_INCLUDE_DIR}")
+        message(STATUS "ONNX Runtime minimum required version: ${ONNXRUNTIME_MIN_VERSION}")
+
         add_library(crkit_onnxruntime
             src/engines/onnxruntime/onnx_engine.cpp
         )
@@ -89,6 +108,7 @@ if(ENABLE_ONNXRUNTIME)
         target_compile_definitions(crkit_core PUBLIC ENABLE_ONNXRUNTIME)
     else()
         message(WARNING "ONNX Runtime not found, disabling ONNX backend")
+        message(WARNING "Please install ONNX Runtime >= ${ONNXRUNTIME_MIN_VERSION}")
         set(ENABLE_ONNXRUNTIME OFF)
     endif()
 endif()

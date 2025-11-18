@@ -16,40 +16,37 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ==========================================
-# 构建阶段 - 编译SDK
+# 构建阶段 - 编译SDK（优化层数）
 # ==========================================
 FROM base AS builder
 
 WORKDIR /tmp
 
-# 安装OpenCV（可选，用于完整功能）
-RUN apt-get update && apt-get install -y \
-    libopencv-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# 安装ONNX Runtime
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.16.3/onnxruntime-linux-x64-1.16.3.tgz && \
+# 合并安装OpenCV和ONNX Runtime，减少层数
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libopencv-dev \
+    && wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.16.3/onnxruntime-linux-x64-1.16.3.tgz && \
     tar -xzf onnxruntime-linux-x64-1.16.3.tgz && \
     cp onnxruntime-linux-x64-1.16.3/lib/* /usr/local/lib/ && \
     cp -r onnxruntime-linux-x64-1.16.3/include/* /usr/local/include/ && \
     ldconfig && \
-    rm -rf onnxruntime-linux-x64-1.16.3*
+    rm -rf onnxruntime-linux-x64-1.16.3* && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 复制源码
+# 复制源码并编译（合并步骤）
 WORKDIR /build
 COPY . .
 
-# 编译SDK
 RUN mkdir -p build && cd build && \
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTS=ON \
         -DBUILD_EXAMPLES=ON \
         -DENABLE_ONNXRUNTIME=ON && \
-    make -j$(nproc)
-
-# 运行测试
-RUN cd build && ctest --output-on-failure
+    make -j$(nproc) && \
+    ctest --output-on-failure
 
 # ==========================================
 # 运行阶段 - 最小化镜像
