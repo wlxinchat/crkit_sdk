@@ -1,23 +1,18 @@
-# Build directories
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Build artifacts
 build/
 cmake-build-*/
 out/
-
-# Compiled files
 *.o
 *.so
 *.a
 *.dylib
 *.dll
 *.exe
-
-# CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
-!CMakeLists.txt
 
 # IDE
 .vscode/
@@ -27,10 +22,10 @@ Makefile
 *~
 .DS_Store
 
-# Test outputs
-test_output/
+# Logs
 *.log
 logs/
+test_output/
 
 # Test executables
 test_tensor
@@ -38,7 +33,7 @@ test_nms
 test_comprehensive
 test_logger
 
-# Models and data
+# Models (too large, mount instead)
 *.engine
 *.onnx
 *.pb
@@ -52,22 +47,31 @@ test_logger
 tmp/
 temp/
 *.tmp
+*.backup
 
 # Documentation build
 docs/_build/
 docs/html/
 docs/latex/
 
-# Python (if adding Python bindings)
+# Python (if present)
 __pycache__/
 *.py[cod]
-*.so
 .Python
 venv/
 env/
-*.backup
 
-# Docker volumes (created by docker-compose)
-models/
-data/
-output/
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# README and docs (keep in image for reference)
+!README.md
+!BUILD_GUIDE.md
+!docs/*.md

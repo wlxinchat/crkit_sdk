@@ -66,6 +66,57 @@ ctest --output-on-failure
 ./test_comprehensive
 ```
 
+### 方式3: 使用Docker部署（推荐用于生产环境）✨
+
+Docker部署提供隔离的运行环境，无需手动安装依赖，支持快速部署和扩展。
+
+#### 快速开始
+
+```bash
+# 1. 构建并运行测试（验证构建）
+docker-compose build crkit-test
+docker-compose run --rm crkit-test
+
+# 预期输出: ✅ 所有测试通过! (30/30)
+
+# 2. 启动生产运行环境
+mkdir -p models data output logs
+docker-compose up -d crkit-runtime
+
+# 3. 进入容器执行推理
+docker-compose exec crkit-runtime bash
+```
+
+#### Docker镜像说明
+
+| 镜像 | 大小 | 用途 | 命令 |
+|------|------|------|------|
+| **crkit-sdk:runtime** | ~800MB | 生产运行 | `docker-compose up crkit-runtime` |
+| **crkit-sdk:dev** | ~2GB | 开发调试 | `docker-compose run crkit-dev` |
+| **crkit-sdk:test** | ~2GB | 自动化测试 | `docker-compose run crkit-test` |
+
+#### 目录挂载
+
+```yaml
+volumes:
+  - ./models:/app/models:ro          # 模型目录（只读）
+  - ./data:/app/data:ro              # 数据目录（只读）
+  - ./logs:/var/log/crkit:rw         # 日志目录（读写）
+  - ./output:/app/output:rw          # 输出目录（读写）
+```
+
+#### 详细文档
+
+完整的Docker部署指南请参考: [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md)
+
+包含内容:
+- 多阶段构建架构
+- CI/CD集成
+- GPU加速部署
+- 故障排查
+- 性能优化
+- 安全最佳实践
+
 ## 详细说明
 
 ### 编译选项

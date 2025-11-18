@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 生产运行环境
+  # ==========================================
+  crkit-runtime:
+    image: crkit-sdk:runtime
+    build:
+      context: .
+      target: runtime
+    container_name: crkit-runtime
+    volumes:
+      - ./models:/app/models:ro          # 模型目录（只读）
+      - ./data:/app/data:ro              # 数据目录（只读）
+      - ./logs:/var/log/crkit:rw         # 日志目录（读写）
+      - ./output:/app/output:rw          # 输出目录（读写）
+    environment:
+      - LD_LIBRARY_PATH=/usr/local/lib
+      - OMP_NUM_THREADS=4
+      - TZ=Asia/Shanghai
+    command: bash
+    restart: unless-stopped
+    networks:
+      - crkit-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  # ==========================================
+  # 开发环境
+  # ==========================================
+  crkit-dev:
+    image: crkit-sdk:dev
+    build:
+      context: .
+      target: development
+    container_name: crkit-dev
+    volumes:
+      - .:/workspace:rw                  # 挂载整个项目（开发用）
+      - ./logs:/var/log/crkit:rw
+    environment:
+      - LD_LIBRARY_PATH=/usr/local/lib
+      - TZ=Asia/Shanghai
+    working_dir: /workspace
+    command: bash
+    stdin_open: true
+    tty: true
+    networks:
+      - crkit-network
+
+  # ==========================================
+  # 测试环境
+  # ==========================================
+  crkit-test:
+    image: crkit-sdk:test
+    build:
+      context: .
+      target: test
+    container_name: crkit-test
+    environment:
+      - LD_LIBRARY_PATH=/usr/local/lib
+      - TZ=Asia/Shanghai
+    networks:
+      - crkit-network
+
+networks:
+  crkit-network:
+    driver: bridge
+
+# ==========================================
+# 使用说明
+# ==========================================
+#
+# 1. 构建所有镜像:
+#    docker-compose build
+#
+# 2. 运行测试:
+#    docker-compose run --rm crkit-test
+#
+# 3. 启动开发环境:
+#    docker-compose run --rm crkit-dev
+#    # 在容器内编译:
+#    mkdir -p build && cd build
+#    cmake .. -DCMAKE_BUILD_TYPE=Release
+#    make -j$(nproc)
+#    ctest
+#
+# 4. 启动生产运行环境:
+#    docker-compose up -d crkit-runtime
+#    docker-compose exec crkit-runtime bash
+#    # 在容器内运行推理:
+#    ./object_detection_example /app/models/model.onnx /app/data/test.jpg 0.5 0.45
+#
+# 5. 查看日志:
+#    docker-compose logs -f crkit-runtime
+#
+# 6. 停止服务:
+#    docker-compose down
+#
+# 7. 清理所有资源:
+#    docker-compose down -v --rmi all
+#

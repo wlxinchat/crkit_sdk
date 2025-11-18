@@ -14,6 +14,7 @@
 - ✅ **模型通用**: 支持各种目标检测模型，无特定模型绑定
 - ✅ **高性能**: ONNX Runtime引擎完整实现，支持CPU/GPU加速
 - ✅ **工业级代码**: 完善的错误处理、资源管理、线程安全
+- ✅ **Docker支持**: 多阶段构建，一键部署，支持生产/开发/测试环境
 - ✅ **丰富文档**: 快速开始、API参考、部署指南一应俱全
 
 ## 🚀 核心特性
@@ -35,7 +36,8 @@
 - ✅ **批处理**: 支持批量图像推理
 - ✅ **多模型管理**: LRU缓存，热更新支持
 - ✅ **线程安全**: 支持多线程并发推理
-- ✅ **完善日志**: 多级别日志系统
+- ✅ **完善日志**: 多级别日志系统（9模块，线程ID，文件轮转）
+- ✅ **Docker部署**: 容器化部署，支持CI/CD和集群扩展
 
 ## 📦 项目结构
 
@@ -148,6 +150,24 @@ make -j$(nproc)
 # - 两阶段检测器（如Faster R-CNN）
 # - Anchor-free检测器
 ```
+
+### 🐳 Docker快速部署（推荐）
+
+使用Docker无需安装依赖，一键部署：
+
+```bash
+# 1. 构建并测试
+docker-compose build crkit-test
+docker-compose run --rm crkit-test
+
+# 2. 生产运行
+docker-compose up -d crkit-runtime
+
+# 3. 进入容器
+docker-compose exec crkit-runtime bash
+```
+
+完整Docker部署指南: [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md)
 
 ## 💻 使用示例
 
