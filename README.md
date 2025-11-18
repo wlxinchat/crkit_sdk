@@ -272,13 +272,12 @@ int main() {
 
 ## 📚 文档
 
-- [快速开始指南](docs/QUICK_START.md) - 详细的安装和使用教程
+- [编译运行指南](BUILD_GUIDE.md) - 快速编译、CMake构建、Docker部署
+- [Docker部署指南](docs/DOCKER_DEPLOYMENT.md) - 容器化部署完整文档
 - [API参考文档](docs/API.md) - 完整的API说明
 - [架构设计文档](docs/DESIGN.md) - SDK架构和设计理念
-- [部署指南](docs/DEPLOYMENT.md) - 生产环境部署最佳实践
 - [测试用例设计](docs/TEST_CASES.md) - 30个测试用例详细说明
-- [测试执行报告](test_reports/COMPREHENSIVE_TEST_REPORT.md) - 100%通过率
-
+- [日志系统分析](docs/LOGGER_ANALYSIS.md) - 标准化日志系统文档
 ## 🛠️ 系统要求
 
 ### 操作系统

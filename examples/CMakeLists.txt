@@ -52,7 +52,23 @@ if(OpenCV_FOUND)
     target_link_libraries(batch_inference ${OpenCV_LIBS})
 endif()
 
+# 目标检测示例
+add_executable(object_detection_example object_detection_example.cpp)
+target_link_libraries(object_detection_example crkit_core)
+
+if(TARGET crkit_tensorrt)
+    target_link_libraries(object_detection_example crkit_tensorrt)
+endif()
+
+if(TARGET crkit_onnxruntime)
+    target_link_libraries(object_detection_example crkit_onnxruntime)
+endif()
+
+if(OpenCV_FOUND)
+    target_link_libraries(object_detection_example ${OpenCV_LIBS})
+endif()
+
 # 安装示例
-install(TARGETS basic_inference advanced_pipeline batch_inference
+install(TARGETS basic_inference advanced_pipeline batch_inference object_detection_example
     RUNTIME DESTINATION bin/examples
 )
